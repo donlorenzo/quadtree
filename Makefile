@@ -36,6 +36,9 @@ install: $(TARGET) $(INSTALL_LIB_DIR) $(INSTALL_HEADER_DIR)
 	cp -a $(TARGET) $(INSTALL_LIB_DIR)/$(TARGET)
 	cp -a $(SRC_DIR)/quadtree.h  $(INSTALL_HEADER_DIR)/quadtree.h
 
-.PHONY: clean
+.PHONY: clean docs
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET) quadtree_test
+
+docs: $(SRC_DIR)/quadtree.h
+	cd docs; doxygen Doxyfile; cd ..
