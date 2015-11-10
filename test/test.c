@@ -119,9 +119,8 @@ int main() {
     test_next_power_of_2();
 
     int i;
-    long *ids;
-    int number_of_ids;
     quadtree_t qt = quadtree_create(0, 0, 80, 60);
+    quadtree_query_result_t *result = quadtree_query_result_allocate();
 
 /*
     int xs[] = { 0, 80000, 0 };
@@ -143,13 +142,12 @@ int main() {
     int ys8[] = { 34, 22, 23 };
     int p[] = { 39, 39 };
 
-    printf("put : %d\n", quadtree_put(qt, 0, 3, xs7, ys7));
-    printf("put : %d\n", quadtree_put(qt, 1, 3, xs8, ys8));
-    printf("get : %d\n", quadtree_get(qt, p[0], p[1], &number_of_ids, &ids));
-    for (i = 0; i < number_of_ids; ++i) {
-        printf("id(%d): %ld\n", i, ids[i]);
+    printf("put : %d\n", quadtree_add(qt, 0, 3, xs7, ys7));
+    printf("put : %d\n", quadtree_add(qt, 1, 3, xs8, ys8));
+    printf("get : %d\n", quadtree_query(qt, p[0], p[1], result));
+    for (i = 0; i < result->number_of_ids; ++i) {
+        printf("id(%d): %ld\n", i, result->ids[i]);
     }
-    free(ids);
 
 /*
     printf("put : %d\n", quadtree_put_polygon(qt, 42, 3, xs, ys));
@@ -194,6 +192,8 @@ int main() {
     }
     free(ids);
 */
+
+    quadtree_query_result_free(result);
     quadtree_destroy(qt);
     return 0;
 }

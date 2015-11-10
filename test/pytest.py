@@ -47,7 +47,7 @@ def test():
             triangles = []
             for i in range(N_triangles):
                 triangles.append(get_random_triangle())
-                quadtree.put(i, triangles[-1])
+                quadtree.add(i, triangles[-1])
                 print triangles[-1]
 
         if new_point:
@@ -55,7 +55,7 @@ def test():
 
         if new_point or new_triangles or update:
             screen.fill(BLACK)
-            ids = quadtree.get(p)
+            ids = quadtree.query(p)
             print ids
             for i in range(N_triangles):
                 color = GREEN if i in ids else BLUE

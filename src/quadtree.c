@@ -77,7 +77,7 @@ static lq_quadtree_node_t* lq_quadtree_node_allocate();
 static void lq_quadtree_node_free(lq_quadtree_node_t *node);
 static void lq_quadtree_node_clear_polygons(lq_quadtree_node_t *node);
 static void lq_quadtree_node_initialize(lq_quadtree_node_t *node, int left, int bottom, int width, int height, int depth);
-static int lq_quadtree_node_get(lq_quadtree_node_t *node, int x, int y, int *number_of_ids, long **ids);
+static int lq_quadtree_node_query(lq_quadtree_node_t *node, int x, int y, quadtree_query_result_t *query_result);
 static lq_quadtree_node_t* lq_quadtree_node_find_leaf(lq_quadtree_node_t *node, int x, int y);
 static int lq_quadtree_node_put_polygon(lq_quadtree_node_t *node, lq_polygon_node_t *polygon);
 static void lq_quadtree_node_remove(lq_quadtree_node_t *node, long id);
@@ -95,6 +95,8 @@ static void lq_rect_free(lq_rect_t *rect);
 static void lq_rect_initialize(lq_rect_t *rect, int rx, int ry, int rw, int rh);
 static int lq_rect_get_quadrant(lq_rect_t *rect, int x, int y);
 static bool lq_rect_point_is_in_bounds(lq_rect_t *rect, int x, int y);
+
+static void lq_quadtree_query_result_reset(quadtree_query_result_t *query_results);
 
 
 /*******************
@@ -129,7 +131,7 @@ void quadtree_destroy(quadtree_t qt) {
     }
 }
 
-int quadtree_put(quadtree_t qt, long id, int number_of_polygon_points, int *xs, int *ys) {
+int quadtree_add(quadtree_t qt, long id, int number_of_polygon_points, int *xs, int *ys) {
     int i;
     int error_code = QUADTREE_SUCCESS;
     lq_quadtree_t *quadtree = (lq_quadtree_t*) qt;
@@ -159,13 +161,23 @@ int quadtree_remove(quadtree_t qt, long id) {
     return QUADTREE_SUCCESS;
 }
 
-int quadtree_get(quadtree_t qt, int x, int y, int *number_of_ids, long **ids) {
+int quadtree_query(quadtree_t qt, int x, int y, quadtree_query_result_t *query_result) {
     lq_quadtree_t *quadtree = (lq_quadtree_t*) qt;
     lq_quadtree_node_t *root = quadtree->root;
     if (!lq_rect_point_is_in_bounds(root->bounding_box, x, y)) {
         return QUADTREE_ERROR_OUT_OF_BOUNDS;
     }
-    return lq_quadtree_node_get(root, x, y, number_of_ids, ids);
+    return lq_quadtree_node_query(root, x, y, query_result);
+}
+
+quadtree_query_result_t* quadtree_query_result_allocate() {
+    quadtree_query_result_t *query_result = (quadtree_query_result_t*) calloc(1, sizeof(quadtree_query_result_t));
+    return query_result;
+}
+
+void quadtree_query_result_free(quadtree_query_result_t *query_result) {
+    lq_quadtree_query_result_reset(query_result);
+    free(query_result);
 }
 
 
@@ -223,34 +235,40 @@ static void lq_quadtree_node_initialize(lq_quadtree_node_t *node, int rx, int ry
     node->depth = depth;
 }
 
-static int lq_quadtree_node_get(lq_quadtree_node_t *node, int x, int y, int *number_of_ids, long **ids) {
+static int lq_quadtree_node_query(lq_quadtree_node_t *node, int x, int y, quadtree_query_result_t *query_result) {
     int i;
+    int number_of_ids = 0;
+    lq_quadtree_query_result_reset(query_result);
+    /* find all polygons... */
     lq_quadtree_node_t *leaf = lq_quadtree_node_find_leaf(node, x, y);
     lq_polygon_node_t *polygon = leaf->polygons;
+    /* ...in the beginning we don't know how many polygons we are going to end up with.
+     *    We only know it will be no more than leaf->number_of_polygons */
     long *tmp_ids = (long*) calloc(leaf->number_of_polygons, sizeof(long));
     if (tmp_ids == NULL) {
         return QUADTREE_ERROR_OUT_OF_MEMORY;
     }
-    (*number_of_ids) = 0;
     while (polygon != NULL) {
         if (point_in_polygon(x, y, polygon->p->number_of_points, polygon->p->xs, polygon->p->ys)) {
-            tmp_ids[(*number_of_ids)] = polygon->p->id;
-            ++(*number_of_ids);
+            tmp_ids[number_of_ids] = polygon->p->id;
+            ++number_of_ids;
         }
         polygon = polygon->next;
     }
 
-    *ids = (long*) malloc((*number_of_ids) * sizeof(long));
+    /* now that we know all polygons copy them into the result */
+    long *ids = (long*) malloc(number_of_ids * sizeof(long));
     if (ids == NULL) {
-        *number_of_ids = -1;
         free(tmp_ids);
         return QUADTREE_ERROR_OUT_OF_MEMORY;
     }
-    for (i = 0; i < (*number_of_ids); ++i) {
-        (*ids)[i] = tmp_ids[i];
+    for (i = 0; i < number_of_ids; ++i) {
+        ids[i] = tmp_ids[i];
     }
-
     free(tmp_ids);
+
+    query_result->number_of_ids = number_of_ids;
+    query_result->ids = ids;
     return QUADTREE_SUCCESS;
 }
 
@@ -534,4 +552,12 @@ static bool lq_rect_point_is_in_bounds(lq_rect_t *rect, int x, int y) {
         return false;
     }
     return true;
+}
+
+static void lq_quadtree_query_result_reset(quadtree_query_result_t *query_result) {
+    if (query_result != NULL) {
+        free(query_result->ids);
+        query_result->ids = NULL;
+        query_result->number_of_ids = -1;
+    }
 }

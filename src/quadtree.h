@@ -53,16 +53,19 @@
  * cover with this quadtree.
  *
  * Next, you should populate the quadtree with polygons by calling
- * quadtree_put().
+ * quadtree_add().
  *
  * Once the quadtree is filled you can query it by calling
- * quadtree_get().  It is important to remember that quadtree_get()
- * allocates heap memory for the results. It is the responsibility of
- * the user of this library to free this memory by calling
- * <stdlib.h>'s free().
+ * quadtree_query().  It expects a pointer to a quadtree_query_result_t
+ * as one of its arguments which will be populated with the result
+ * of the query.  To obtain a quadtree_query_result_t you should call
+ * quadtree_query_result_allocate().  After processing the results you
+ * can reuse a quadtree_query_result_t object for further queries.
+ * Once you are done with a quadtree_query_result_t object you should
+ * dispose of it by calling quadtree_query_result_free().
  *
  * Should a polygon change it has to be removed by calling
- * quadtree_remove() and readded by calling quadtree_put().
+ * quadtree_remove() and readded by calling quadtree_add().
  *
  * When the quadtree is no longer needed it can be disposed of by
  * calling quadtree_destroy(). This will clean up all internal data
@@ -89,29 +92,28 @@
  *     quadtree_t quadtree = quadtree_create(0, 0, 800, 600);
  *     assert(quadtree != NULL);
  *     for (int i=0; i < 10; ++i) {
- *         quadtree_put(quadtree, (long) i,
+ *         quadtree_add(quadtree, (long) i,
  *                      polygons[i]->number_of_corners,
  *                      polygons[i]->x_coords, polygons[i]->y_coords);
  *     }
  *
  *     // query the quadtree
+ *     quadtree_query_result_t *result = quadtree_query_result_allocate();
  *     int point_to_query_x = ...;
  *     int point_to_query_y = ...;
  *     int error_code;
- *     int number_of_ids = 0;
- *     long *ids = NULL;
  *     error_code = quadtree_get(quadtree, point_to_query_x, point_to_query_y,
- *                               &number_of_ids, &ids);
+ *                               result);
  *     if (error_code != QUADTREE_SUCCESS) {
  *         // ... handle error
  *     }
- *     for (int i = 0; i < number_of_ids; ++i) {
+ *     for (int i = 0; i < result->number_of_ids; ++i) {
  *         printf("polygon %ld contains the query point (%d, %d)\n",
- *                (*ids)[i], point_to_query_x, point_to_query_y);
+ *                result->ids[i], point_to_query_x, point_to_query_y);
  *     }
  *
  *     // clean up
- *     free(ids);
+ *     quadtree_query_result_free(result);
  *     quadtree_destroy(quadtree);
  *     return 0;
  * }
@@ -133,6 +135,27 @@ int QUADTREE_ERROR_OUT_OF_BOUNDS =       3;
  */
 typedef struct lq_quadtree_t *quadtree_t;
 
+/**
+ * @brief Structure to hold the result of a quadtree query
+ *
+ * This structure should be passed to quadtree_query() and will
+ * then contain the result of that query.  It can be reused for
+ * multiple queries befor being disposed of by calling
+ * quadtree_query_result_free().
+ *
+ * @see quadtree_query_result_allocate()
+ * @see quadtree_query_result_free()
+ * @see quadtree_query()
+ */
+typedef struct {
+    /** the number of ids this query result contains or -1 if the
+     * query failed
+     */
+    int number_of_ids;
+    /** an array of ids that resulted from the query */
+    long *ids;
+} quadtree_query_result_t;
+
 
 /**
  * @brief Creates a new quadtree object
@@ -141,7 +164,8 @@ typedef struct lq_quadtree_t *quadtree_t;
  * arguments.  The arguments \a width and \a height must be positive.
  * The area cannot be changed, moved, or resized during the lifetime
  * of a quadtree.  Callers should check the return value before using
- * it.
+ * it.  When done using the quadtree it should be destroied by calling
+ * quadtree_destroy().
  *
  * @param left the x coordinate of the left side of the area covered
  *             by the quadtree
@@ -186,7 +210,7 @@ void quadtree_destroy(quadtree_t quadtree);
  * @see quadtree_get
  * @see quadtree_remove
  */
-int quadtree_put(quadtree_t quadtree, long id, int number_of_polygon_points, int xs[], int ys[]);
+int quadtree_add(quadtree_t quadtree, long id, int number_of_polygon_points, int xs[], int ys[]);
 
 /**
  * @brief Get a list of polygon ids that contain the given point.
@@ -208,10 +232,10 @@ int quadtree_put(quadtree_t quadtree, long id, int number_of_polygon_points, int
  *                                       bounding box
  * @returns QUADTREE_ERROR_OUT_OF_MEMORY if the function could not
  *                                       allocate memory
- * @see quadtree_put
+ * @see quadtree_add
  * @see quadtree_remove
  */
-int quadtree_get(quadtree_t quadtree, int x, int y, int *number_of_ids, long **ids);
+int quadtree_query(quadtree_t quadtree, int x, int y, quadtree_query_result_t *query_result);
 
 /**
  * @brief Removes a polygon from a quadtree
@@ -222,9 +246,32 @@ int quadtree_get(quadtree_t quadtree, int x, int y, int *number_of_ids, long **i
  * @param quadtree the quadtree to operate on
  * @param id the id of the polygon to be removed from the quadtree
  * @returns QUADTREE_SUCCESS always. This function cannot fail.
- * @see quadtree_put
+ * @see quadtree_add
  * @see quadtree_get
  */
 int quadtree_remove(quadtree_t quadtree, long id);
+
+/**
+ * @brief Allocate a new quadtree_query_result_t
+ *
+ * This should be used to create quadtree_query_result_t objects for use
+ * with quadtree_query().  When done using the result object it should
+ * be freed by calling quadtree_query_result_free().
+ *
+ * @return a pointer to a new quadtree_query_result_t object to be used
+ *         with quadtree_query()
+ * @see quadtree_query_result_free()
+ * @see quadtree_query()
+ */
+quadtree_query_result_t *quadtree_query_result_allocate();
+
+/**
+ * @brief Frees the memory pointed to by \a query_result
+ * @param query_result the quadtree_query_result_t object to dispose of
+ * @see quadtree_query_result_allocate()
+ * @see quadtree_query()
+ */
+void quadtree_query_result_free(quadtree_query_result_t *query_result);
+
 
 #endif /* DE_LORENZQUACK_CODE_QUADTREE_H */
