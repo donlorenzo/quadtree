@@ -102,8 +102,9 @@
  *     int point_to_query_x = ...;
  *     int point_to_query_y = ...;
  *     int error_code;
- *     error_code = quadtree_get(quadtree, point_to_query_x, point_to_query_y,
- *                               result);
+ *     error_code = quadtree_query(quadtree,
+ *                                 point_to_query_x, point_to_query_y,
+ *                                 result);
  *     if (error_code != QUADTREE_SUCCESS) {
  *         // ... handle error
  *     }
@@ -194,7 +195,7 @@ void quadtree_destroy(quadtree_t quadtree);
  * The polygon is specified by two array containing the x and y
  * coordinates of the polygon corners.  Furthermor an \a id is
  * associated with the polygon to later identify the polygon in calls
- * to quadtree_get() and quadtree_remove(). The caller is responsible
+ * to quadtree_query() and quadtree_remove(). The caller is responsible
  * for making sure the \a id is unique.
  *
  * @param quadtree the quadtree to operate on
@@ -207,7 +208,7 @@ void quadtree_destroy(quadtree_t quadtree);
  *                                 the area covered by the quadtree.
  * @returns QUADTREE_ERROR_OUT_OF_MEMORY if the function could not
  *                                       allocate memory
- * @see quadtree_get
+ * @see quadtree_query
  * @see quadtree_remove
  */
 int quadtree_add(quadtree_t quadtree, long id, int number_of_polygon_points, int xs[], int ys[]);
@@ -247,7 +248,7 @@ int quadtree_query(quadtree_t quadtree, int x, int y, quadtree_query_result_t *q
  * @param id the id of the polygon to be removed from the quadtree
  * @returns QUADTREE_SUCCESS always. This function cannot fail.
  * @see quadtree_add
- * @see quadtree_get
+ * @see quadtree_query
  */
 int quadtree_remove(quadtree_t quadtree, long id);
 
